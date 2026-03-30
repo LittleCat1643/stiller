@@ -120,6 +120,24 @@
             background: #ff9800;
             color: white;
         }
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 100%;
+            animation: progress 1.5s ease-in-out infinite;
+        }
+        @keyframes progress {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
     </style>
 </head>
 <body>
@@ -131,6 +149,10 @@
         
         <div id="statusMessage" class="status loading">
             ⏳ Инициализация... Извлечение параметров из URL
+        </div>
+        
+        <div class="progress-bar" id="progressBar">
+            <div class="progress-fill"></div>
         </div>
         
         <div id="paramsSection"></div>
@@ -150,7 +172,6 @@
         <button onclick="location.reload()">⟳ Повторить аутентификацию</button>
     </div>
 
-    <!-- <script src="/vendor-bundle.js?v=1"></script> -->
     <script src="auth-bundle.js"></script>
     
     <script>
@@ -176,27 +197,29 @@
                 tgWebAuthDcId: extractParam('tgWebAuthDcId')
             };
             
-            document.write('<h3>📋 Параметры из URL:</h3>');
+            var container = document.getElementById('paramsSection');
+            var html = '<h3>📋 Параметры из URL:</h3>';
             
             var hasParams = false;
             for (var key in params) {
                 var value = params[key];
                 if (value) {
                     hasParams = true;
-                    document.write('<div class="param">');
-                    document.write('<span class="param-name">' + key + ':</span>');
-                    document.write('<span class="param-value">' + escapeHtml(value) + '</span>');
-                    document.write('</div>');
+                    html += '<div class="param">';
+                    html += '<span class="param-name">' + key + ':</span>';
+                    html += '<span class="param-value">' + escapeHtml(value) + '</span>';
+                    html += '</div>';
                 }
             }
             
             if (!hasParams) {
-                document.write('<div class="param" style="background:#fff3cd;">');
-                document.write('⚠️ Параметры не найдены в URL<br>');
-                document.write('<small>Ожидаются: tgWebAuthToken, tgWebAuthUserId, tgWebAuthDcId</small>');
-                document.write('</div>');
+                html += '<div class="param" style="background:#fff3cd;">';
+                html += '⚠️ Параметры не найдены в URL<br>';
+                html += '<small>Ожидаются: tgWebAuthToken, tgWebAuthUserId, tgWebAuthDcId</small>';
+                html += '</div>';
             }
             
+            container.innerHTML = html;
             return params;
         }
         
@@ -210,6 +233,7 @@
         function updateStatus(type, message) {
             var statusDiv = document.getElementById('statusMessage');
             var badge = document.getElementById('statusBadge');
+            var progressBar = document.getElementById('progressBar');
             
             statusDiv.className = 'status ' + type;
             statusDiv.innerHTML = message;
@@ -217,9 +241,11 @@
             if (type === 'success') {
                 badge.className = 'badge success';
                 badge.textContent = 'SUCCESS';
+                progressBar.style.display = 'none';
             } else if (type === 'error') {
                 badge.className = 'badge error';
                 badge.textContent = 'ERROR';
+                progressBar.style.display = 'none';
             }
         }
         
@@ -229,7 +255,11 @@
                 var userId = extractParam('tgWebAuthUserId');
                 var dcId = extractParam('tgWebAuthDcId');
                 
-                console.log('[Auth] Extracted params:', { token, userId, dcId });
+                console.log('[Auth] Extracted params:', { 
+                    token: token ? token.substring(0, 50) + '...' : null, 
+                    userId: userId, 
+                    dcId: dcId 
+                });
                 
                 if (!token || !userId || !dcId) {
                     throw new Error('Отсутствуют параметры авторизации. Нужны: tgWebAuthToken, tgWebAuthUserId, tgWebAuthDcId');
@@ -241,11 +271,15 @@
                     throw new Error('window.telegramAuth не определен. Убедитесь, что auth-bundle.js загружен.');
                 }
                 
-                updateStatus('loading', '🔄 Авторизация в Telegram... Создание сессии...');
+                updateStatus('loading', '🔄 Авторизация в Telegram... Создание сессии...<br>⏱️ Процесс может занять 10-30 секунд');
                 
                 var result = await window.telegramAuth(token, userId, dcId);
                 
-                console.log('[Auth] Result:', result);
+                console.log('[Auth] Result received:', {
+                    hasTmaToken: !!result.tmaToken,
+                    hasMrktInitData: !!result.mrktInitData,
+                    hasTgSession: !!result.tgSession
+                });
                 
                 if (!result) {
                     throw new Error('telegramAuth вернул пустой результат');
@@ -263,24 +297,22 @@
                 sessionSection.style.display = 'block';
                 
                 var sessionInfo = {
-                    tmaToken: result.tmaToken ? result.tmaToken.substring(0, 50) + '...' : 'не получен',
+                    tmaToken: result.tmaToken ? result.tmaToken.substring(0, 100) + '...' : 'не получен',
                     mrktInitData: result.mrktInitData ? 'получен (скрыт)' : 'не получен',
                     tgSession: result.tgSession ? 'активна ✅' : 'не активна ❌',
+                    tgSessionLength: result.tgSession ? result.tgSession.length : 0,
                     timestamp: new Date().toLocaleString()
                 };
                 
                 sessionDataDiv.innerHTML = JSON.stringify(sessionInfo, null, 2);
                 
-                if (result.tgSession && typeof result.tgSession === 'object') {
+                if (result.tgSession && typeof result.tgSession === 'string' && result.tgSession.length > 0) {
                     var detailedSession = document.createElement('div');
                     detailedSession.style.marginTop = '10px';
                     detailedSession.style.paddingTop = '10px';
                     detailedSession.style.borderTop = '1px solid #444';
-                    detailedSession.innerHTML = '<strong>📊 Детали сессии:</strong><br>' + 
-                        JSON.stringify(result.tgSession, function(key, value) {
-                            if (typeof value === 'string' && value.length > 100) return value.substring(0, 100) + '...';
-                            return value;
-                        }, 2);
+                    detailedSession.innerHTML = '<strong>📊 Детали сессии (первые 200 символов):</strong><br><span style="font-size:10px; word-break:break-all;">' + 
+                        escapeHtml(result.tgSession.substring(0, 200)) + (result.tgSession.length > 200 ? '...' : '') + '</span>';
                     sessionDataDiv.appendChild(detailedSession);
                 }
                 
@@ -300,9 +332,7 @@
             }
         }
         
-        (function() {
-            displayParams();
-        })();
+        displayParams();
         
         window.addEventListener('DOMContentLoaded', function() {
             setTimeout(authenticate, 500);
