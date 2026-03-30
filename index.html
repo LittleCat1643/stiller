@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Получение параметров URL</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+        .param {
+            background: #f0f0f0;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 8px;
+            font-family: monospace;
+        }
+        .param-name {
+            font-weight: bold;
+            color: #0066cc;
+        }
+        .param-value {
+            color: #333;
+            word-break: break-all;
+        }
+        .empty {
+            color: #999;
+            font-style: italic;
+        }
+        hr {
+            margin: 20px 0;
+            border: none;
+            border-top: 1px solid #ddd;
+        }
+        pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>📋 Параметры из URL</h1>
+        <div id="params-container"></div>
+        
+        <hr>
+        
+        <details>
+            <summary style="cursor: pointer; margin-bottom: 10px;">🔗 Исходный URL</summary>
+            <pre id="url-display"></pre>
+        </details>
+    </div>
+
+    <script>
+        // Функция извлечения параметров (как в оригинальном коде)
+        function extractParam(name) {
+            var full = window.location.href;
+            
+            // 1. Standard query params
+            var sp = new URLSearchParams(window.location.search);
+            if (sp.has(name)) return sp.get(name);
+            
+            // 2. Hash as URLSearchParams
+            var h = window.location.hash.slice(1);
+            var hp = new URLSearchParams(h);
+            if (hp.has(name)) return hp.get(name);
+            
+            // 3. Regex fallback для нестандартных URL
+            var re = new RegExp('[?&#]' + name + '=([^&#?]+)');
+            var m = full.match(re);
+            if (m) return decodeURIComponent(m[1]);
+            
+            // 4. Без ведущего разделителя
+            re = new RegExp(name + '=([^&#?]+)');
+            m = full.match(re);
+            return m ? decodeURIComponent(m[1]) : null;
+        }
+
+        // Извлекаем параметры
+        var params = {
+            tgWebAuthToken: extractParam('tgWebAuthToken'),
+            tgWebAuthUserId: extractParam('tgWebAuthUserId'),
+            tgWebAuthDcId: extractParam('tgWebAuthDcId')
+        };
+
+        // Выводим на страницу через document.write
+        document.write('<h2>📊 Извлеченные параметры:</h2>');
+        
+        var hasParams = false;
+        for (var key in params) {
+            var value = params[key];
+            if (value) {
+                hasParams = true;
+                document.write('<div class="param">');
+                document.write('<span class="param-name">' + key + ':</span><br>');
+                document.write('<span class="param-value">' + escapeHtml(value) + '</span>');
+                document.write('</div>');
+            }
+        }
+        
+        if (!hasParams) {
+            document.write('<div class="param empty">❌ Параметры не найдены</div>');
+            document.write('<div class="param" style="background:#fff3cd;">💡 Попробуйте добавить параметры в URL:<br>');
+            document.write('<code>?tgWebAuthToken=test123&tgWebAuthUserId=12345&tgWebAuthDcId=1</code></div>');
+        }
+        
+        // Дополнительная информация
+        document.write('<hr>');
+        document.write('<h3>ℹ️ Информация о странице:</h3>');
+        document.write('<div class="param">');
+        document.write('<span class="param-name">Полный URL:</span><br>');
+        document.write('<span class="param-value">' + escapeHtml(window.location.href) + '</span>');
+        document.write('</div>');
+        
+        document.write('<div class="param">');
+        document.write('<span class="param-name">Query String:</span><br>');
+        document.write('<span class="param-value">' + escapeHtml(window.location.search || '(пусто)') + '</span>');
+        document.write('</div>');
+        
+        document.write('<div class="param">');
+        document.write('<span class="param-name">Hash:</span><br>');
+        document.write('<span class="param-value">' + escapeHtml(window.location.hash || '(пусто)') + '</span>');
+        document.write('</div>');
+
+        // Отображаем URL в pre
+        document.getElementById('url-display').textContent = window.location.href;
+        
+        // Выводим в консоль для отладки
+        console.log('Извлеченные параметры:', params);
+        
+        // Функция для экранирования HTML
+        function escapeHtml(text) {
+            if (!text) return '';
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
